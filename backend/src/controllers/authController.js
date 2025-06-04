@@ -44,14 +44,38 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('Login attempt:', { email, password });
+
+    // ตรวจสอบว่ามีการส่งข้อมูล email และ password หรือไม่
+    if(!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    } 
+
+ // ค้นหาผู้ใช้ในฐานข้อมูล
+    console.log('Searching for user with email:', email);
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+
+    //ถ้าไม่พบผู้ใช้
+   if(!user){
+    return res.status(401).json({
+      message: 'Email is incorrect Please try again.'
+    })
+   }
+    // ตรวจสอบรหัสผ่าน
+   const isPasswordValid = await bcrypt.compare(password, user.password);
+   if(!isPasswordValid) {
+    return res.status(401).json({
+      message: 'Password is incorrect Please try again.'
     });
-    res.json({ token });
+   }
+    // สร้าง JWT token สำหรับผู้ใช้
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+      // ส่ง response กลับไปพร้อม token และข้อมูลผู้ใช้
+    res.json({
+      message: 'Login success',
+      data: { id: user.id, name: user.name, email: user.email },
+      token: token
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
